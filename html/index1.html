@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة إكس وأو</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        table {
+            margin: 20px auto;
+            border-collapse: collapse;
+        }
+
+        td {
+            width: 40px;
+            height: 40px;
+            border: 1px solid #000000;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        td.playerO {
+            color: red;
+        }
+
+        td.cellX, td.cellO {
+            background-color: white;
+        }
+
+        td.cellX {
+            color: blue;
+        }
+
+        h2 {
+            color: #333;
+        }
+
+        .results {
+            width: 200px;
+            text-align: right;
+            display: none;
+        }
+
+        .player-record {
+            border: 1px solid #000;
+            padding: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+
+<audio id="winSoundX" src="path/to/your/x_winsound.mp3"></audio>
+<audio id="winSoundO" src="path/to/your/o_winsound.mp3"></audio>
+
+<div class="game-section">
+    <h2>لعبة إكس وأو</h2>
+    <p>اختر نوع اللعبة:</p>
+    <button onclick="startGame('player')">لاعب ضد لاعب</button>
+    <button onclick="startGame('computer')">لاعب ضد الكمبيوتر</button>
+
+    <div id="scoreboard" style="display: none;">
+        <p>نتيجة الألعاب:</p>
+        <p id="playerXScore">اللاعب X: 0 فوز</p>
+        <p id="playerOScore">اللاعب O: 0 فوز</p>
+        <p id="drawScore">التعادل: 0</p>
+    </div>
+
+    <table id="ticTacToe" style="display: none;">
+        <tr>
+            <td onclick="play(0, 0)"></td>
+            <td onclick="play(0, 1)"></td>
+            <td onclick="play(0, 2)"></td>
+        </tr>
+        <tr>
+            <td onclick="play(1, 0)"></td>
+            <td onclick="play(1, 1)"></td>
+            <td onclick="play(1, 2)"></td>
+        </tr>
+        <tr>
+            <td onclick="play(2, 0)"></td>
+            <td onclick="play(2, 1)"></td>
+            <td onclick="play(2, 2)"></td>
+        </tr>
+    </table>
+</div>
+
+<div class="results" id="resultsSection">
+    <button onclick="toggleResults()">إخفاء السجل</button>
+    <h3>نتائج سابقة:</h3>
+    <div id="resultsList"></div>
+</div>
+
+<script>
+    let currentPlayer = 'X';
+    let board = [
+        ['', '', ''],
+        ['', '', ''],
+        ['', '', '']
+    ];
+    let gameType = '';
+    let playerXWins = 0;
+    let playerOWins = 0;
+    let drawCount = 0;
+    let computerSkillLevel = 0;
+    let playerName = '';
+
+    function startGame(type) {
+        if (gameType !== type) {
+            resetScores();
+        }
+
+        if (type === 'computer') {
+            playerName = prompt("أدخل اسمك:", "اللاعب");
+            document.getElementById('resultsSection').style.display = 'block';
+        } else {
+            document.getElementById('resultsSection').style.display = 'none';
+        }
+
+        gameType = type;
+        resetGame();
+        document.getElementById('ticTacToe').style.display = 'table';
+        document.getElementById('scoreboard').style.display = 'block';
+        document.querySelectorAll('.game-section button').forEach(button => button.disabled = true);
+        loadResults();
+    }
+
+    function play(row, col) {
+        if (board[row][col] === '') {
+            board[row][col] = currentPlayer;
+            const cell = document.getElementById('ticTacToe').rows[row].cells[col];
+            cell.innerHTML = currentPlayer;
+
+            if (currentPlayer === 'O') {
+                cell.classList.add('playerO');
+            } else {
+                cell.classList.add('cellX');
+            }
+
+            if (checkWinner()) {
+                playWinSound(currentPlayer);
+                updateScore(currentPlayer);
+                if (gameType === 'computer') {
+                    saveResult(playerName, currentPlayer);
+                }
+                resetGame();
+            } else if (isBoardFull()) {
+                drawCount++;
+                document.getElementById('drawScore').innerText = `التعادل: ${drawCount}`;
+                resetGame();
+            } else {
+                currentPlayer = (currentPlayer === 'X') ? 'O' : 'X';
+
+                if (gameType === 'computer' && currentPlayer === 'O') {
+                    setTimeout(playComputer, 500);
+                }
+            }
+        }
+    }
+
+    function playWinSound(player) {
+        const winSound = document.getElementById(`winSound${player}`);
+        winSound.play();
+    }
+
+    function playComputer() {
+        let availableCells = [];
+
+        for (let i = 0; i < 3; i++) {
+            for (let j = 0; j < 3; j++) {
+                if (board[i][j] === '') {
+                    availableCells.push({ row: i, col: j });
+                }
+            }
+        }
+
+        if (availableCells.length > 0) {
+            const bestMove = getBestMove(availableCells);
+            play(bestMove.row, bestMove.col);
+        }
+    }
+
+    function getBestMove(availableCells) {
+        if (computerSkillLevel === 0) {
+            const randomIndex = Math.floor(Math.random() * availableCells.length);
+            return availableCells[randomIndex];
+        } else if (computerSkillLevel === 1) {
+            for (let cell of availableCells) {
+                if (canWin('O', cell.row, cell.col)) {
+                    return cell;
+                }
+                if (canWin('X', cell.row, cell.col)) {
+                    return cell;
+                }
+            }
+            const randomIndex = Math.floor(Math.random() * availableCells.length);
+            return availableCells[randomIndex];
+        } else {
+            return availableCells[0];
+        }
+    }
+
+    function canWin(player, row, col) {
+        const tempBoard = JSON.parse(JSON.stringify(board));
+        tempBoard[row][col] = player;
+        return checkWinner(tempBoard);
+    }
+
+    function checkWinner(boardToCheck = board) {
+        for (let i = 0; i < 3; i++) {
+            if (boardToCheck[i][0] === currentPlayer && boardToCheck[i][1] === currentPlayer && boardToCheck[i][2] === currentPlayer) {
+                return true;
+            }
+            if (boardToCheck[0][i] === currentPlayer && boardToCheck[1][i] === currentPlayer && boardToCheck[2][i] === currentPlayer) {
+                return true;
+            }
+        }
+
+        if (boardToCheck[0][0] === currentPlayer && boardToCheck[1][1] === currentPlayer && boardToCheck[2][2] === currentPlayer) {
+            return true;
+        }
+        if (boardToCheck[0][2] === currentPlayer && boardToCheck[1][1] === currentPlayer && boardToCheck[2][0] === currentPlayer) {
+            return true;
+        }
+
+        return false;
+    }
+
+    function isBoardFull() {
+        for (let row of board) {
+            if (row.includes('')) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function resetGame() {
+        currentPlayer = 'X';
+        board = [
+            ['', '', ''],
+            ['', '', ''],
+            ['', '', '']
+        ];
+
+        const cells = document.querySelectorAll('#ticTacToe td');
+        cells.forEach(cell => {
+            cell.innerHTML = '';
+            cell.classList.remove('playerO', 'cellX');
+        });
+
+        if (gameType === 'player') {
+            document.querySelectorAll('.game-section button').forEach(button => button.disabled = false);
+        }
+
+        computerSkillLevel = Math.min(computerSkillLevel + 1, 2);
+    }
+
+    function resetScores() {
+        playerXWins = 0;
+        playerOWins = 0;
+        drawCount = 0;
+        document.getElementById('playerXScore').innerText = `اللاعب X: 0 فوز`;
+        document.getElementById('playerOScore').innerText = `اللاعب O: 0 فوز`;
+        document.getElementById('drawScore').innerText = `التعادل: 0`;
+    }
+
+    function updateScore(player) {
+        if (player === 'X') {
+            playerXWins++;
+            document.getElementById('playerXScore').innerText = `اللاعب X: ${playerXWins} فوز`;
+        } else {
+            playerOWins++;
+            document.getElementById('playerOScore').innerText = `اللاعب O: ${playerOWins} فوز`;
+        }
+    }
+
+    function saveResult(playerName, winner) {
+        const result = {
+            playerName: playerName,
+            winner: winner,
+            date: new Date().toLocaleDateString('ar-EG')
+        };
+
+        let results = localStorage.getItem('ticTacToeResults');
+        if (results) {
+            results = JSON.parse(results);
+        } else {
+            results = [];
+        }
+
+        results.push(result);
+        localStorage.setItem('ticTacToeResults', JSON.stringify(results));
+        loadResults();
+    }
+
+    function loadResults() {
+        const resultsList = document.getElementById('resultsList');
+        resultsList.innerHTML = '';
+
+        let results = localStorage.getItem('ticTacToeResults');
+        if (results) {
+            results = JSON.parse(results);
+            const playerResults = {};
+
+            results.forEach(result => {
+                if (!playerResults[result.playerName]) {
+                    playerResults[result.playerName] = { X: 0, O: 0, dates: [] };
+                }
+                playerResults[result.playerName][result.winner]++;
+                if (!playerResults[result.playerName].dates.includes(result.date)) {
+                    playerResults[result.playerName].dates.push(result.date);
+                }
+            });
+
+            for (const player in playerResults) {
+                const playerDiv = document.createElement('div');
+                playerDiv.classList.add('player-record');
+
+                const playerNameHeader = document.createElement('h4');
+                playerNameHeader.innerText = `اللاعب: ${player}`;
+                playerDiv.appendChild(playerNameHeader);
+
+                const playerStats = document.createElement('p');
+                playerStats.innerText = `انتصارات X: ${playerResults[player].X}, انتصارات O: ${playerResults[player].O}`;
+                playerDiv.appendChild(playerStats);
+
+                const playerDates = document.createElement('p');
+                playerDates.innerText = `التواريخ: ${playerResults[player].dates.join(', ')}`;
+                playerDiv.appendChild(playerDates);
+
+                resultsList.appendChild(playerDiv);
+            }
+        }
+    }
+
+    function toggleResults() {
+        const resultsSection = document.getElementById('resultsSection');
+        const toggleButton = resultsSection.querySelector('button');
+        if (resultsSection.style.display === 'none' || resultsSection.style.display === '') {
+            resultsSection.style.display = 'block';
+            toggleButton.innerText = 'إخفاء السجل';
+        } else {
+            resultsSection.style.display = 'none';
+            toggleButton.innerText = 'إظهار السجل';
+        }
+    }
+</script>
+
+</body>
+</html>
